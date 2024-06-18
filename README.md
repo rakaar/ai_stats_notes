@@ -13,7 +13,8 @@
 - [PCA](https://github.com/rakaar/ai_stats_notes/blob/main/stats/pca.ipynb)
 - [ANOVA, Chi Square](https://github.com/rakaar/ai_stats_notes/blob/main/stats/anova_and_chi_sq.ipynb)
 - [Linear Reg, Logistic Reg, GLM, GLM with Mixed effects](https://github.com/rakaar/ai_stats_notes/blob/main/stats/reg_glm.ipynb)
-- [Bayesian Stats - Conj Pairs, MCMC, Simulation Based Inference](https://github.com/rakaar/ai_stats_notes/blob/main/stats/bayesian.ipynb)
+- [Bayesian Stats - Conj Pairs, MCMC, SNPE(incomplete), Kernel Desntiy Est.](https://github.com/rakaar/ai_stats_notes/blob/main/stats/bayesian.ipynb)
+- [Bayesian Libraries - Dynesty for Nested Samp., VBMC for Posterior Est., BADS for Optimization](https://github.com/rakaar/ai_stats_notes/blob/main/stats/bayesian_libs.ipynb)
 
 # Neural
 - [Drift Diffusion Model](https://github.com/rakaar/ai_stats_notes/blob/main/neural/drift_diff.ipynb)
