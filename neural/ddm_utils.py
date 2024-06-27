@@ -1,10 +1,41 @@
 import numpy as np
 from numba import jit, njit
 from scipy import integrate
+import pickle
+from pybads import BADS
 
+def run_bads_3param():
+    # actual: v,a,w: 2, 10, 0.5. 
+    lower_bounds = np.array([-10, 0.1, 0.1]) 
+    upper_bounds = np.array([10, 15, 0.9])
+
+    plausible_lower_bounds = np.array([-5, 1, 0.2])
+    plausible_upper_bounds = np.array([5, 13, 0.8])
+
+    v0 = np.random.uniform(plausible_lower_bounds[0], plausible_upper_bounds[0])
+    a0 = np.random.uniform(plausible_lower_bounds[1], plausible_upper_bounds[1])
+    w0 = np.random.uniform(plausible_lower_bounds[2], plausible_upper_bounds[2])
+    x0 = np.array([v0, a0, w0]);
+
+    options = {'display': 'off'}
+    bads = BADS(bads_target_func, x0, lower_bounds, upper_bounds, plausible_lower_bounds, plausible_upper_bounds, options=options)
+    optimize_result = bads.optimize()
+
+    x_min = optimize_result['x']
+    return x_min
+    
+
+
+def bads_target_func(params):
+    v, a, w = params
+    with open('sample_rt.pkl', 'rb') as f:
+        RTs = pickle.load(f)
+    probs = np.array([rtd_density_a(t, v, a, w) + rtd_density_a(t, -v, a, 1-w) for t in RTs])
+    return -np.sum(np.log(probs))
+    
 
 @jit(nopython=True)
-def rtd_density(t, mu, K_max=100):
+def rtd_density(t, mu, K_max=50):
     k_vals = np.linspace(0, K_max, K_max+1)
     sum_neg_1_term = (-1)**k_vals
     sum_two_k_term = (2*k_vals) + 1
@@ -28,13 +59,6 @@ def prob_rt(t_arr, v):
         prob_arr[i] = integrate.quad(rtd_density, t_arr[i], t_arr[i+1], args=(v))[0]
     return prob_arr
 
-
-# def prob_rt(t_arr, v, a, w, K_max=100):
-#     N_t = len(t_arr)
-#     prob_arr = np.zeros((N_t-1,1))
-#     for i in range(0, N_t-1):
-#         prob_arr[i] = integrate.quad(rtd_density, t_arr[i], t_arr[i+1], args=(v,a,w,K_max))[0]
-#     return prob_arr
 
 
 def calculate_histogram(x_axis, y_axis):
@@ -64,7 +88,7 @@ def simulate_ddm(v, a, dt=1e-5):
         
 
 @jit(nopython=True)
-def rtd_density_a(t, v, a, w, K_max=100):
+def rtd_density_a(t, v, a, w, K_max=50):
     if t > 0.25:
         non_sum_term = (np.pi/a**2)*np.exp(-v*a*w - (v**2 * t/2))
         k_vals = np.linspace(1, K_max, K_max)
@@ -79,7 +103,19 @@ def rtd_density_a(t, v, a, w, K_max=100):
         sum_exp_term = np.exp(-(a**2 * (w + 2*k_vals)**2)/(2*t))
         sum_result = np.sum(sum_w_term*sum_exp_term)
 
-    return non_sum_term * sum_result
+    if sum_result < 0:
+        sum_result += 1e-9
+    
+    density =  non_sum_term * sum_result
+    if density < 0:
+        print('+++++++++++++++++++++++++++++')
+        print("t:", t, "v:", v, "a:", a, "w:", w, "sum_result:", sum_result, "non_sum_term:", non_sum_term, "\n")
+        print(' sine term = ', sum_sine_term)
+
+        print('+++++++++++++++++++++++++++++++')
+        raise ValueError("Density cannot be negative")
+    else:
+        return density
 
 def prob_rt_a(t_arr,v,a,w):
     N_t = len(t_arr)
