@@ -3,14 +3,64 @@ from numba import jit, njit
 from scipy import integrate
 import pickle
 from pybads import BADS
+import re
+import matplotlib.pyplot as plt
+
+
+def rtd_mu_large_t(t,mu, K_max=10):
+    non_sum_term = (np.pi/2) * np.cosh(mu) * np.exp(-(mu**2)*t/2)
+    k_vals = np.linspace(0, K_max, K_max + 1)
+    sum_neg_1_term = (-1)**k_vals
+    sum_two_k_term = (2*k_vals) + 1
+    sum_exp_term = np.exp(-(((2*k_vals + 1)**2)*(np.pi**2)*t )/(8))
+    sum_term = np.sum(sum_neg_1_term*sum_two_k_term*sum_exp_term)
+    return non_sum_term*sum_term
+
+def rtd_mu_small_t(t, mu, K_max=10):
+    non_sum_term = 2 * np.cosh(mu) * np.exp(-(mu**2)*t/2) * np.sqrt(1/np.sqrt(2*np.pi*(t**3)))
+    k_vals = np.linspace(0, K_max, K_max + 1)
+    sum_neg_1_term = (-1)**k_vals
+    sum_two_k_term = (2*k_vals) + 1
+    sum_exp_term = np.exp(-((2*k_vals + 1)**2)/(2*t))
+    sum_term = np.sum(sum_neg_1_term*sum_two_k_term*sum_exp_term)
+    return non_sum_term*sum_term
+
+
+def rtd_mu(t,mu, smol_to_large_trans_fac=0.1):
+    if t > smol_to_large_trans_fac:
+        return rtd_mu_large_t(t, mu)
+    else:
+        return rtd_mu_small_t(t, mu)
+
+def prob_rt_mu(t_arr, mu, smol_to_large_trans_fac):
+    N_t = len(t_arr)
+    prob_arr = np.zeros((N_t-1,1))
+    for i in range(0, N_t-1):
+        prob_arr[i] = integrate.quad(rtd_mu, t_arr[i], t_arr[i+1], args=(mu, smol_to_large_trans_fac))[0]
+    return prob_arr
+
 
 def run_bads_3param():
-    # actual: v,a,w: 2, 10, 0.5. 
-    lower_bounds = np.array([-10, 0.1, 0.1]) 
-    upper_bounds = np.array([10, 15, 0.9])
+    # Large range
+    # lower_bounds = np.array([-10, 0.1, 0.1]) 
+    # upper_bounds = np.array([10, 15, 0.9])
 
-    plausible_lower_bounds = np.array([-5, 1, 0.2])
-    plausible_upper_bounds = np.array([5, 13, 0.8])
+    # plausible_lower_bounds = np.array([-5, 1, 0.2])
+    # plausible_upper_bounds = np.array([5, 13, 0.8])
+
+    # narrow range: v = 4, a = 2: v,a,w
+    # lower_bounds = np.array([0.1, 0.1, 0.1]) 
+    # upper_bounds = np.array([7, 5, 0.9])
+
+    # plausible_lower_bounds = np.array([0.5, 1, 0.3])
+    # plausible_upper_bounds = np.array([5, 4, 0.7])
+
+    # narrow range: a = 10 v = 2
+    lower_bounds = np.array([0.5, 5, 0.2]) 
+    upper_bounds = np.array([5, 15, 0.8])
+
+    plausible_lower_bounds = np.array([1, 8.5, 0.3])
+    plausible_upper_bounds = np.array([4, 11.5, 0.7])
 
     v0 = np.random.uniform(plausible_lower_bounds[0], plausible_upper_bounds[0])
     a0 = np.random.uniform(plausible_lower_bounds[1], plausible_upper_bounds[1])
@@ -18,11 +68,15 @@ def run_bads_3param():
     x0 = np.array([v0, a0, w0]);
 
     options = {'display': 'off'}
-    bads = BADS(bads_target_func, x0, lower_bounds, upper_bounds, plausible_lower_bounds, plausible_upper_bounds, options=options)
-    optimize_result = bads.optimize()
-
-    x_min = optimize_result['x']
-    return x_min
+    
+    try:
+        bads = BADS(bads_target_func, x0, lower_bounds, upper_bounds, plausible_lower_bounds, plausible_upper_bounds, options=options)
+        optimize_result = bads.optimize()
+        x_min = optimize_result['x']
+        return x_min
+    except Exception as e:
+        print(f"Error during optimization: {e}")
+        run_bads_3param()
     
 
 
@@ -32,7 +86,56 @@ def bads_target_func(params):
         RTs = pickle.load(f)
     probs = np.array([rtd_density_a(t, v, a, w) + rtd_density_a(t, -v, a, 1-w) for t in RTs])
     return -np.sum(np.log(probs))
-    
+
+
+def ex22_bads_plots(filename):
+    match = re.search(r'v(\d+)_a(\d+)', filename)
+    v = int(match.group(1))
+    a = int(match.group(2))
+
+    with open(filename, 'rb') as f:
+        vaw_bads_vals = pickle.load(f)
+
+
+
+    v_vals_from_bads = [x[0] for x in vaw_bads_vals]
+    a_vals_from_bads = [x[1] for x in vaw_bads_vals]
+    w_vals_from_bads = [x[2] for x in vaw_bads_vals]
+
+    plt.figure(figsize=(10,5))
+    plt.subplot(1,3,1)
+    plt.hist(v_vals_from_bads)
+    plt.title(f'v: mean={np.mean(v_vals_from_bads):.2f},median={np.median(v_vals_from_bads):.2f},Truth = {v}', fontsize=8)
+    plt.subplot(1,3,2)
+    plt.hist(a_vals_from_bads)
+    plt.title(f'a: mean={np.mean(a_vals_from_bads):.2f},median={np.median(a_vals_from_bads):.2f}, ground Truth = {a}', fontsize=8)
+    plt.subplot(1,3,3)
+    plt.hist(w_vals_from_bads)
+    plt.title(f'w: mean={np.mean(w_vals_from_bads):.2f},median={np.median(w_vals_from_bads):.2f},Truth = 0.5',fontsize=8)
+    plt.tight_layout()
+    plt.show()
+
+
+
+    plt.figure(figsize=(10,5))
+    plt.subplot(1,3,1)
+    plt.scatter(a_vals_from_bads, v_vals_from_bads)
+    plt.title('a vs v')
+    plt.xlabel('a')
+    plt.ylabel('v')
+    plt.subplot(1,3,2)
+    plt.scatter(w_vals_from_bads, a_vals_from_bads)
+    plt.title('w vs a')
+    plt.xlabel('w')
+    plt.ylabel('a')
+    plt.subplot(1,3,3)
+    plt.scatter(v_vals_from_bads, w_vals_from_bads)
+    plt.title('v vs w')
+    plt.xlabel('v')
+    plt.ylabel('w')
+    plt.tight_layout()
+    plt.show()
+
 
 @jit(nopython=True)
 def rtd_density(t, mu, K_max=50):
@@ -104,7 +207,7 @@ def rtd_density_a(t, v, a, w, K_max=50):
         sum_result = np.sum(sum_w_term*sum_exp_term)
 
     if sum_result < 0:
-        sum_result += 1e-9
+        sum_result += 1e-3
     
     density =  non_sum_term * sum_result
     if density < 0:
