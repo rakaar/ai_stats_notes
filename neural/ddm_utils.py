@@ -7,6 +7,7 @@ import re
 import matplotlib.pyplot as plt
 
 
+
 def rtd_mu_large_t(t,mu, K_max=10):
     non_sum_term = (np.pi/2) * np.cosh(mu) * np.exp(-(mu**2)*t/2)
     k_vals = np.linspace(0, K_max, K_max + 1)
@@ -17,7 +18,7 @@ def rtd_mu_large_t(t,mu, K_max=10):
     return non_sum_term*sum_term
 
 def rtd_mu_small_t(t, mu, K_max=10):
-    non_sum_term = 2 * np.cosh(mu) * np.exp(-(mu**2)*t/2) * np.sqrt(1/np.sqrt(2*np.pi*(t**3)))
+    non_sum_term = 2 * np.cosh(mu) * np.exp(-(mu**2)*t/2) * (1/np.sqrt(2*np.pi*(t**3)))
     k_vals = np.linspace(0, K_max, K_max + 1)
     sum_neg_1_term = (-1)**k_vals
     sum_two_k_term = (2*k_vals) + 1
@@ -39,14 +40,34 @@ def prob_rt_mu(t_arr, mu, smol_to_large_trans_fac):
         prob_arr[i] = integrate.quad(rtd_mu, t_arr[i], t_arr[i+1], args=(mu, smol_to_large_trans_fac))[0]
     return prob_arr
 
+def prob_rt_generic(t_arr, mu, func):
+    N_t = len(t_arr)
+    prob_arr = np.zeros((N_t-1,1))
+    for i in range(0, N_t-1):
+        prob_arr[i] = integrate.quad(func, t_arr[i], t_arr[i+1], args=(mu))[0]
+    return prob_arr
+
+def get_param_N_bads_tensor(N_sample_sizes, a, v, N_bads_run):
+    param_N_bads = np.zeros((len(N_sample_sizes), N_bads_run, 3))
+    for i,n in enumerate(N_sample_sizes):
+        fname = f'vaw_bads_vals_v{v}_a{a}_n{n}.pkl'
+        try:
+            with open(fname, 'rb') as f:
+                vaw_50 = pickle.load(f)
+        except Exception as e:
+            print(f"File {fname} is empty. Skipping.")
+            continue
+        param_N_bads[i] = vaw_50
+    
+    return param_N_bads
 
 def run_bads_3param():
     # Large range
-    # lower_bounds = np.array([-10, 0.1, 0.1]) 
-    # upper_bounds = np.array([10, 15, 0.9])
+    lower_bounds = np.array([0.01, 5, 0.1]) 
+    upper_bounds = np.array([10, 15, 0.9])
 
-    # plausible_lower_bounds = np.array([-5, 1, 0.2])
-    # plausible_upper_bounds = np.array([5, 13, 0.8])
+    plausible_lower_bounds = np.array([0.5, 7, 0.2])
+    plausible_upper_bounds = np.array([7, 13, 0.8])
 
     # narrow range: v = 4, a = 2: v,a,w
     # lower_bounds = np.array([0.1, 0.1, 0.1]) 
@@ -56,11 +77,11 @@ def run_bads_3param():
     # plausible_upper_bounds = np.array([5, 4, 0.7])
 
     # narrow range: a = 10 v = 2
-    lower_bounds = np.array([0.5, 5, 0.2]) 
-    upper_bounds = np.array([5, 15, 0.8])
+    # lower_bounds = np.array([0.5, 8, 0.2]) 
+    # upper_bounds = np.array([5, 12, 0.8])
 
-    plausible_lower_bounds = np.array([1, 8.5, 0.3])
-    plausible_upper_bounds = np.array([4, 11.5, 0.7])
+    # plausible_lower_bounds = np.array([1, 9, 0.3])
+    # plausible_upper_bounds = np.array([4, 11, 0.7])
 
     v0 = np.random.uniform(plausible_lower_bounds[0], plausible_upper_bounds[0])
     a0 = np.random.uniform(plausible_lower_bounds[1], plausible_upper_bounds[1])
@@ -87,6 +108,41 @@ def bads_target_func(params):
     probs = np.array([rtd_density_a(t, v, a, w) + rtd_density_a(t, -v, a, 1-w) for t in RTs])
     return -np.sum(np.log(probs))
 
+def ex22_bads_vs_N_plots(N_sample_sizes, param_names, ground_truths, param_N_bads):
+    N_sample_sizes_str = [str(size) for size in N_sample_sizes]
+    indices = range(len(N_sample_sizes))  # Use indices for equally spaced x-ticks
+
+    plt.figure(figsize=(15, 5))
+    for i in range(3):
+        N_bads_val = param_N_bads[:, :, i]
+        plt.subplot(1, 3, i + 1)
+        plt.errorbar(indices, np.mean(N_bads_val, axis=1), yerr=np.std(N_bads_val, axis=1) / np.sqrt(50), fmt='o-', capsize=5)
+        plt.axhline(y=ground_truths[i], color='r', linestyle='-', label=f'Ground Truth: {ground_truths[i]}')
+        plt.xlabel('Sample Size')
+        plt.ylabel(f'Mean of {i+1}th Parameter')
+        plt.title(f'Mean of {i+1}th Parameter vs Sample Size {param_names[i]}')
+        plt.xticks(indices, N_sample_sizes_str)  # Setting x-tick labels to string representations of N_sample_sizes
+
+    plt.tight_layout()
+    plt.show()
+
+    plt.figure(figsize=(15, 5))
+    for i in range(3):
+        N_bads_val = param_N_bads[:, :, i]
+
+        median_vals = np.median(N_bads_val, axis=1)
+        mad_vals = np.median(np.abs(N_bads_val - np.median(N_bads_val, axis=1, keepdims=True)), axis=1)
+
+        plt.subplot(1, 3, i + 1)
+        plt.errorbar(indices, median_vals, yerr=mad_vals, fmt='o-', capsize=5)
+        plt.axhline(y=ground_truths[i], color='r', linestyle='-', label=f'Ground Truth: {ground_truths[i]}')
+        plt.xlabel('Sample Size')
+        plt.ylabel(f'Median of {i+1}th Parameter')
+        plt.title(f'Median of {i+1}th Parameter vs Sample Size {param_names[i]}')
+        plt.xticks(indices, N_sample_sizes_str)  # Setting x-tick labels to string representations of N_sample_sizes
+
+    plt.tight_layout()
+    plt.show()
 
 def ex22_bads_plots(filename):
     match = re.search(r'v(\d+)_a(\d+)', filename)
