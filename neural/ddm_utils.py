@@ -5,10 +5,11 @@ import pickle
 from pybads import BADS
 import re
 import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
 
 
 
-def rtd_mu_large_t(t,mu, K_max=10):
+def rtd_mu_large_t(t,mu, K_max=5):
     non_sum_term = (np.pi/2) * np.cosh(mu) * np.exp(-(mu**2)*t/2)
     k_vals = np.linspace(0, K_max, K_max + 1)
     sum_neg_1_term = (-1)**k_vals
@@ -17,7 +18,7 @@ def rtd_mu_large_t(t,mu, K_max=10):
     sum_term = np.sum(sum_neg_1_term*sum_two_k_term*sum_exp_term)
     return non_sum_term*sum_term
 
-def rtd_mu_small_t(t, mu, K_max=10):
+def rtd_mu_small_t(t, mu, K_max=5):
     non_sum_term = 2 * np.cosh(mu) * np.exp(-(mu**2)*t/2) * (1/np.sqrt(2*np.pi*(t**3)))
     k_vals = np.linspace(0, K_max, K_max + 1)
     sum_neg_1_term = (-1)**k_vals
@@ -27,7 +28,7 @@ def rtd_mu_small_t(t, mu, K_max=10):
     return non_sum_term*sum_term
 
 
-def rtd_mu(t,mu, smol_to_large_trans_fac=0.1):
+def rtd_mu(t,mu, smol_to_large_trans_fac):
     if t > smol_to_large_trans_fac:
         return rtd_mu_large_t(t, mu)
     else:
@@ -38,6 +39,24 @@ def prob_rt_mu(t_arr, mu, smol_to_large_trans_fac):
     prob_arr = np.zeros((N_t-1,1))
     for i in range(0, N_t-1):
         prob_arr[i] = integrate.quad(rtd_mu, t_arr[i], t_arr[i+1], args=(mu, smol_to_large_trans_fac))[0]
+    return prob_arr
+
+# def prob_rt_mu_posterior(t_arr, mu, smol_to_large_trans_fac):
+#     N_t = len(t_arr)
+#     prob_arr = np.zeros((N_t-1,1))
+#     for i in range(0, N_t-1):
+
+#         prob_arr[i] = integrate.quad(rtd_mu, t_arr[i]-0.0001, t_arr[i]+0.0001, args=(mu, smol_to_large_trans_fac))[0]
+#     return prob_arr
+
+def prob_rt_mu_posterior(t_arr, mu, smol_to_large_trans_fac):
+    N_t = len(t_arr)
+    def compute_prob(i):
+        return integrate.quad(rtd_mu, t_arr[i]-0.0001, t_arr[i]+0.0001, args=(mu, smol_to_large_trans_fac))[0]
+    
+    prob_arr = Parallel(n_jobs=-1)(delayed(compute_prob)(i) for i in range(0, N_t-1))
+    prob_arr = np.array(prob_arr).reshape(-1, 1)
+
     return prob_arr
 
 def prob_rt_generic(t_arr, mu, func):
