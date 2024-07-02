@@ -9,7 +9,7 @@ from joblib import Parallel, delayed
 
 
 
-def rtd_mu_large_t(t,mu, K_max=5):
+def rtd_mu_large_t(t,mu, K_max=50):
     non_sum_term = (np.pi/2) * np.cosh(mu) * np.exp(-(mu**2)*t/2)
     k_vals = np.linspace(0, K_max, K_max + 1)
     sum_neg_1_term = (-1)**k_vals
@@ -18,7 +18,7 @@ def rtd_mu_large_t(t,mu, K_max=5):
     sum_term = np.sum(sum_neg_1_term*sum_two_k_term*sum_exp_term)
     return non_sum_term*sum_term
 
-def rtd_mu_small_t(t, mu, K_max=5):
+def rtd_mu_small_t(t, mu, K_max=50):
     non_sum_term = 2 * np.cosh(mu) * np.exp(-(mu**2)*t/2) * (1/np.sqrt(2*np.pi*(t**3)))
     k_vals = np.linspace(0, K_max, K_max + 1)
     sum_neg_1_term = (-1)**k_vals
