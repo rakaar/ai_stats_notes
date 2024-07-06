@@ -18,6 +18,59 @@ def sim_data_to_files(v,a):
     with open('sample_choice.pkl', 'wb') as f:
         pickle.dump(choices, f)
 
+def sim_data_to_files_N(v,a,n):
+    with open('all_sim_results.pkl', 'rb') as f:
+        all_sim_results = pickle.load(f)
+    
+    keyname = f"a={str(a)},v={str(v)}"
+    choices, RTs = parse_sim_results(all_sim_results[keyname])
+    
+    RTs = np.array(RTs)
+    choices = np.array(choices)
+
+    selected_indices = np.random.choice(len(RTs), size=n, replace=False)
+
+    selected_RTs = RTs[selected_indices]
+    selected_choices = choices[selected_indices]
+
+    with open('sample_rt.pkl', 'wb') as f:
+        pickle.dump(selected_RTs, f)
+    with open('sample_choice.pkl', 'wb') as f:
+        pickle.dump(selected_choices, f)
+
+def plot_bads_vs_N_median(bads_sim_results):
+    sample_sizes = list(bads_sim_results.keys())
+    param_names = ['v', 'a', 'w']
+
+    # Calculate statistics
+    medians = {param: [] for param in param_names}
+    mad = {param: [] for param in param_names}
+
+    for size in sample_sizes:
+        data = bads_sim_results[size]
+        for i, param in enumerate(param_names):
+            medians[param].append(np.median(data[:, i]))
+            mad[param].append(np.median(np.abs(data[:, i] - np.median(data[:, i]))))
+
+    # Convert sample sizes to strings for x-axis labels
+    sample_size_labels = [str(size) for size in sample_sizes]
+    # Plotting
+    fig, axes = plt.subplots(3, 1, figsize=(10, 15))
+
+    for i, param in enumerate(param_names):
+        ax = axes[i]
+        ax.errorbar(sample_size_labels, medians[param], yerr=mad[param], fmt='-o', label='Median ± MAD')
+        
+        ax.set_xticks(range(len(sample_size_labels)))
+        ax.set_xticklabels(sample_size_labels)
+        ax.set_xlabel('Sample Size')
+        ax.set_ylabel(param)
+        ax.set_title(f'{param} Median Statistics')
+        ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
 def parse_sim_results(results):
     choices =  [r[0] for r in results]
     rts = [r[1] for r in results]
@@ -97,7 +150,18 @@ def run_bads(lb, ub, plb, pub):
     except Exception as e:
         print(f"Error during optimization: {e}, running again")
         run_bads(lb, ub, plb, pub)
-        
+
+
+def bads_vs_N(lb,ub,plb,pub,N_sample,v,a):
+    N_iter = 30
+    results = Parallel(n_jobs=-1)(delayed(run_bads)(lb, ub, plb, pub) for _ in range(N_iter))
+    results_array = np.array(results)
+
+    save_results_array = {'results': results_array, 'a': a, 'v': v, 'N_iter': N_iter}
+    with open(f'bads_v{v}_a{a}_n{N_sample}.pkl', 'wb') as f:
+        pickle.dump(save_results_array, f)
+    return results_array
+
 def run_bads_N_iter(lb,ub,plb,pub,N_iter,v,a):
     results = Parallel(n_jobs=-1)(delayed(run_bads)(lb, ub, plb, pub) for _ in range(N_iter))
     results_array = np.array(results)
