@@ -59,15 +59,11 @@ def log_prior(params):
     a_prior = stats.uniform(loc=prior_bounds['a_low'], scale=prior_bounds['a_high'] - prior_bounds['a_low'])
     w_prior = stats.uniform(loc=prior_bounds['w_low'], scale=prior_bounds['w_high'] - prior_bounds['w_low'])
 
-    # sample random
-    v_sample = np.random.uniform(prior_bounds['v_low'], prior_bounds['v_high'])
-    a_sample = np.random.uniform(prior_bounds['a_low'], prior_bounds['a_high'])
-    w_sample = np.random.uniform(prior_bounds['w_low'], prior_bounds['w_high'])
-
+    
     # pdf
-    log_prior_v = v_prior.logpdf(v_sample)
-    log_prior_a = a_prior.logpdf(a_sample)
-    log_prior_w = w_prior.logpdf(w_sample)
+    log_prior_v = v_prior.logpdf(v)
+    log_prior_a = a_prior.logpdf(a)
+    log_prior_w = w_prior.logpdf(w)
 
     sum_log_priors = log_prior_v + log_prior_a + log_prior_w
 
