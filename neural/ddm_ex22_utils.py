@@ -77,7 +77,7 @@ def parse_sim_results(results):
     return choices, rts
 
 @jit(nopython=True)
-def rtd_density_a(t, v, a, w, K_max=10):
+def rtd_density_a(t, v, a, w, K_max=5):
     if t > 0.25:
         non_sum_term = (np.pi/a**2)*np.exp(-v*a*w - (v**2 * t/2))
         k_vals = np.linspace(1, K_max, K_max)
@@ -153,14 +153,14 @@ def run_bads(lb, ub, plb, pub):
 
 
 def bads_vs_N(lb,ub,plb,pub,N_sample,v,a):
-    N_iter = 30
+    N_iter = 100
     results = Parallel(n_jobs=-1)(delayed(run_bads)(lb, ub, plb, pub) for _ in range(N_iter))
-    results_array = np.array(results)
+    # results_array = np.array(results)
 
-    save_results_array = {'results': results_array, 'a': a, 'v': v, 'N_iter': N_iter}
-    with open(f'bads_v{v}_a{a}_n{N_sample}.pkl', 'wb') as f:
-        pickle.dump(save_results_array, f)
-    return results_array
+    # save_results_array = {'results': results, 'a': a, 'v': v, 'N_iter': N_iter}
+    # with open(f'bads_v{v}_a{a}_n{N_sample}.pkl', 'wb') as f:
+    #     pickle.dump(save_results_array, f)
+    return results
 
 def run_bads_N_iter(lb,ub,plb,pub,N_iter,v,a):
     results = Parallel(n_jobs=-1)(delayed(run_bads)(lb, ub, plb, pub) for _ in range(N_iter))
